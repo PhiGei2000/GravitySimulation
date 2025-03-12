@@ -105,14 +105,17 @@ void Renderer::draw(const SimulationState<Mass>& state, int stepIndex) const {
     std::vector<glm::vec2> vertices;
     std::vector<unsigned int> indices;
 
-    int objectsCount = state.objectsCount();
+    int objectsCount = state.objectsCount(stepIndex);
     vertices.reserve(17 * objectsCount);
     indices.reserve(17 * 3 * objectsCount);
 
     unsigned int offset = 0;
 
-    for (int i = 0; i < objectsCount; i++) {
-        const std::vector<glm::vec2>& circle = genCircle(state.getPosition(i, stepIndex), state.getAttributes(i).radius);
+    // for (int i = 0; i < objectsCount; i++) {
+    for (auto it = state.begin(stepIndex); it != state.end(stepIndex); it++) {
+        const glm::vec2 position = it->getPosition(stepIndex).value();
+
+        const std::vector<glm::vec2>& circle = genCircle(position, it->attributes.radius);
         vertices.insert(vertices.end(), circle.begin(), circle.end());
 
         for (int j = 0; j < circle.size() - 1; j++) {
