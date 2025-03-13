@@ -18,5 +18,6 @@ class Renderer {
   public:
     Renderer(const Window* window);
 
-    void draw(const SimulationState<Mass>& state, int stepIndex = -1) const;
+    template<typename T>
+    void draw(const std::vector<Object<T>>& state) const;
 };

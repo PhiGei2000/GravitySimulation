@@ -100,22 +100,21 @@ Renderer::Renderer(const Window* window)
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 }
 
-void Renderer::draw(const SimulationState<Mass>& state, int stepIndex) const {
+template<>
+void Renderer::draw(const std::vector<Object<Mass>>& state) const {
     // update buffers
     std::vector<glm::vec2> vertices;
     std::vector<unsigned int> indices;
 
-    int objectsCount = state.objectsCount(stepIndex);
+    int objectsCount = state.size();
     vertices.reserve(17 * objectsCount);
     indices.reserve(17 * 3 * objectsCount);
 
     unsigned int offset = 0;
 
     // for (int i = 0; i < objectsCount; i++) {
-    for (auto it = state.begin(stepIndex); it != state.end(stepIndex); it++) {
-        const glm::vec2 position = it->getPosition(stepIndex).value();
-
-        const std::vector<glm::vec2>& circle = genCircle(position, it->attributes.radius);
+    for (auto it = state.begin(); it != state.end(); it++) {
+        const std::vector<glm::vec2>& circle = genCircle(it->position, it->attributes.radius);
         vertices.insert(vertices.end(), circle.begin(), circle.end());
 
         for (int j = 0; j < circle.size() - 1; j++) {

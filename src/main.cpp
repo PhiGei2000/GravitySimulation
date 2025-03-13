@@ -17,59 +17,55 @@ int main(int, char**) {
 
         Renderer renderer(&window);
 
-        Simulation<Mass>::ForceCallback a = [](int index, int timeStep, const std::vector<Object<Mass>>& objects) {
+        Simulation<Mass>::ForceCallback a = [](int index, const std::vector<Object<Mass>>& objects) {
             static constexpr float G = 6.6743E-11;
             glm::vec2 acceleration = glm::vec2(0.0f);
 
-            timeStep = timeStep == -1 ? objects[index].positions.size() - 1 : timeStep;
-            return objects[index].getPosition(timeStep).and_then([&](const glm::vec2& pos1) {
-                                                           for (int j = 0; j < objects.size(); j++) {
-                                                               if (j == index || !objects[j].exists(timeStep))
-                                                                   continue;
+            for (int j = 0; j < objects.size(); j++) {
+                if (j == index)
+                    continue;
 
-                                                               auto p2 = objects[j].getPosition(timeStep);
-                                                               if (!p2.has_value()) {
-                                                                   continue;
-                                                               }
+                const glm::vec2& distanceVec = objects[j].position - objects[index].position;
+                const float distance = glm::sqrt(glm::dot(distanceVec, distanceVec));
 
-                                                               const glm::vec2& distanceVec = p2.value() - pos1;
-                                                               const float distance = glm::sqrt(glm::dot(distanceVec, distanceVec));
+                acceleration += G * objects[j].attributes.mass / glm::pow(distance, 3.0f) * distanceVec;
+            }
 
-                                                               acceleration += G * objects[j].attributes.mass / glm::pow(distance, 3.0f) * distanceVec;
-                                                           }
-
-                                                           return std::optional(acceleration);
-                                                       })
-                .value_or(glm::vec2(0.0f));
+            return acceleration;
         };
 
-        Simulation<Mass>::CollisionCallback onCollision = [](int index, const std::vector<int>& collisions, int time, std::vector<Object<Mass>>& objects) {
+        Simulation<Mass>::CollisionCallback onCollision = [](int index, const std::vector<int>& collisions, const std::vector<Object<Mass>>& objects) {
             float mass = objects[index].attributes.mass;
             float radiusSquare = objects[index].attributes.radius * objects[index].attributes.radius;
-            glm::vec2 pos = objects[index].attributes.mass * objects[index].getPosition(time).value();
-            glm::vec2 vel = objects[index].attributes.mass * objects[index].getVelocity(time).value();
-
-            // objects[index].attributes.mass = 0;
-            objects[index].destructionTime = time;
+            glm::vec2 pos = objects[index].attributes.mass * objects[index].position;
+            glm::vec2 vel = objects[index].attributes.mass * objects[index].velocity;
 
             for (int i : collisions) {
                 mass += objects[i].attributes.mass;
                 radiusSquare += objects[i].attributes.radius * objects[i].attributes.radius;
-                pos += objects[i].attributes.mass * objects[i].getPosition(time).value();
-                vel += objects[i].attributes.mass * objects[i].getVelocity(time).value();
-
-                // objects[i].attributes.mass = 0;
-                objects[i].destructionTime = time;
+                pos += objects[i].attributes.mass * objects[i].position;
+                vel += objects[i].attributes.mass * objects[i].velocity;
             }
 
-            objects.emplace_back(pos / mass, vel / mass, mass, glm::sqrt(radiusSquare)).creationTime = time;
+            return Object<Mass>(pos / mass, vel / mass, mass, glm::sqrt(radiusSquare));
         };
 
-        std::vector<Object<Mass>> objects = {
-            {glm::vec2{0.0f}, glm::vec2{0.0f}, 1E12f, 10.0f},
-            {glm::vec2{100.0f, 0.0f}, glm::vec2{0.0f, 1.0f}, 1E11f, 5.0f},
-            {glm::vec2{-150.0f, 0.0f}, glm::vec2{0.0f, -0.5f}, 1E11f, 5.0f},
-        };
+        std::vector<Object<Mass>> objects;
+
+        float density = 1E10f;
+        for (int i = 0; i < 1000; i++) {
+            float radius = rand() / static_cast<float>(RAND_MAX) * 5.0f + 1.0f;
+            float mass = radius * radius * density;
+
+            const glm::vec2& position = {
+                rand() / static_cast<float>(RAND_MAX) * 800.0f - 400.0f,
+                rand() / static_cast<float>(RAND_MAX) * 800.0f - 400.0f,
+            };
+
+            const glm::vec2& velocity = 4.5f * glm::normalize(glm::vec2{position.y, -position.x});
+
+            objects.emplace_back(position, velocity, mass, radius);
+        }
 
         Simulation<Mass> sim = Simulation<Mass>(objects, a, onCollision);
 
@@ -77,9 +73,7 @@ int main(int, char**) {
             sim.step();
         }
 
-        SimulationState<Mass> state = SimulationState<Mass>(sim);
         int index = 0;
-
         auto frameDuration = 5ms;
         float timeSinceLastFrame = 0;
         float lastTime = 0;
@@ -87,10 +81,10 @@ int main(int, char**) {
 
         while (!window.shouldClose()) {
             if (index < sim.endTime()) {
-                renderer.draw(state, index);
+                renderer.draw(sim.getState(index));
             }
             else {
-                renderer.draw(state);
+                renderer.draw(sim.states.back());
             }
 
             float time = glfwGetTime();
