@@ -17,7 +17,7 @@ int main(int, char**) {
 
         Renderer renderer(&window);
 
-        Simulation<Mass>::ForceCallback a = [](int index, const std::vector<Object<Mass>>& objects) {
+        Simulation<Mass, glm::vec2>::ForceCallback a = [](int index, const std::vector<Object<Mass>>& objects) {
             static constexpr float G = 6.6743E-11;
             glm::vec2 acceleration = glm::vec2(0.0f);
 
@@ -34,7 +34,7 @@ int main(int, char**) {
             return acceleration;
         };
 
-        Simulation<Mass>::CollisionCallback onCollision = [](int index, const std::vector<int>& collisions, const std::vector<Object<Mass>>& objects) {
+        Simulation<Mass, glm::vec2>::CollisionCallback onCollision = [](int index, const std::vector<int>& collisions, const std::vector<Object<Mass>>& objects) {
             float mass = objects[index].attributes.mass;
             float radiusSquare = objects[index].attributes.radius * objects[index].attributes.radius;
             glm::vec2 pos = objects[index].attributes.mass * objects[index].position;
@@ -67,7 +67,7 @@ int main(int, char**) {
             objects.emplace_back(position, velocity, mass, radius);
         }
 
-        Simulation<Mass> sim = Simulation<Mass>(objects, a, onCollision);
+        Simulation<Mass, glm::vec2> sim = Simulation<Mass, glm::vec2>(objects, a, onCollision);
 
         for (int i = 0; i < 10000; i++) {
             sim.step();
