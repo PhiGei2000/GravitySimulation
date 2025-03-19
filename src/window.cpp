@@ -20,6 +20,7 @@ void Window::init() {
 
     glfwSetWindowSizeCallback(window, sizeCallback);
     glfwSetKeyCallback(window, keyCallback);
+    glfwSetScrollCallback(window, scrollCallback);
 
     glfwSetWindowUserPointer(window, this);
     glfwMakeContextCurrent(window);
@@ -79,4 +80,16 @@ void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, 
             windowPtr->keyActions[key] = KeyActions::RELEASED;
             break;
     }
+}
+
+void Window::scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
+    Window* windowPtr = static_cast<Window*>(glfwGetWindowUserPointer(window));
+
+    for (const auto& scrollCallback : windowPtr->scrollCallbacks) {
+        scrollCallback.operator()(windowPtr, xOffset, yOffset);
+    }
+}
+
+void Window::addScrollCallback(const ScrollCallback& callback) {
+    scrollCallbacks.push_back(callback);
 }

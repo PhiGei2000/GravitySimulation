@@ -2,6 +2,8 @@
 #include "simulation.hpp"
 #include "window.hpp"
 
+#include "mass.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
@@ -10,68 +12,80 @@
 
 using namespace std::chrono_literals;
 
+using ValueType = double;
+const int dimension = 2;
+
+using Vec = glm::vec<dimension, ValueType>;
+
+Simulation<dimension, ValueType, Mass> runSimulation() {
+    Simulation<2, ValueType, Mass>::ForceCallback a = [](int index, const std::vector<Object<2, ValueType, Mass>>& objects) {
+        static constexpr ValueType G = 6.6743E-11;
+        Vec acceleration = Vec(0.0);
+
+        for (int j = 0; j < objects.size(); j++) {
+            if (j == index)
+                continue;
+
+            const Vec& distanceVec = objects[j].position - objects[index].position;
+            const ValueType distance = glm::sqrt(glm::dot(distanceVec, distanceVec));
+
+            acceleration += G * objects[j].attributes.mass / glm::pow(distance, 3.0f) * distanceVec;
+        }
+
+        return acceleration;
+    };
+
+    Simulation<dimension, ValueType, Mass>::CollisionCallback onCollision = [](int index, const std::vector<int>& collisions, const std::vector<Object<dimension, ValueType, Mass>>& objects) {
+        float mass = objects[index].attributes.mass;
+        float radiusSquare = objects[index].attributes.radius * objects[index].attributes.radius;
+        Vec pos = static_cast<ValueType>(objects[index].attributes.mass) * objects[index].position;
+        Vec vel = static_cast<ValueType>(objects[index].attributes.mass) * objects[index].velocity;
+
+        for (int i : collisions) {
+            mass += objects[i].attributes.mass;
+            radiusSquare += objects[i].attributes.radius * objects[i].attributes.radius;
+            pos += static_cast<ValueType>(objects[i].attributes.mass) * objects[i].position;
+            vel += static_cast<ValueType>(objects[i].attributes.mass) * objects[i].velocity;
+        }
+
+        return Object<dimension, ValueType, Mass>(pos / static_cast<ValueType>(mass), vel / static_cast<ValueType>(mass), mass, glm::sqrt(radiusSquare));
+    };
+
+    std::vector<Object<dimension, ValueType, Mass>> objects;
+
+    float density = 1E10f;
+    for (int i = 0; i < 100; i++) {
+        float radius = rand() / static_cast<float>(RAND_MAX) * 5.0f + 1.0f;
+        float mass = radius * radius * density;
+
+        const Vec& position = {
+            rand() / static_cast<float>(RAND_MAX) * 800.0 - 400.0,
+            rand() / static_cast<float>(RAND_MAX) * 800.0 - 400.0,
+        };
+
+        const Vec& velocity = static_cast<ValueType>(2.5) * glm::normalize(Vec{position.y, -position.x});
+
+        objects.emplace_back(position, velocity, mass, radius);
+    }
+
+    Simulation<dimension, ValueType, Mass> sim = Simulation<dimension, ValueType, Mass>(objects, a, onCollision);
+
+    for (int i = 0; i < 5000; i++) {
+        sim.step();
+    }
+
+    return sim;
+}
+
 int main(int, char**) {
+    const Simulation<dimension, ValueType, Mass>& sim = runSimulation();
+
     Window window;
     try {
         window.init();
 
-        Renderer renderer(&window);
-
-        Simulation<Mass, glm::vec2>::ForceCallback a = [](int index, const std::vector<Object<Mass>>& objects) {
-            static constexpr float G = 6.6743E-11;
-            glm::vec2 acceleration = glm::vec2(0.0f);
-
-            for (int j = 0; j < objects.size(); j++) {
-                if (j == index)
-                    continue;
-
-                const glm::vec2& distanceVec = objects[j].position - objects[index].position;
-                const float distance = glm::sqrt(glm::dot(distanceVec, distanceVec));
-
-                acceleration += G * objects[j].attributes.mass / glm::pow(distance, 3.0f) * distanceVec;
-            }
-
-            return acceleration;
-        };
-
-        Simulation<Mass, glm::vec2>::CollisionCallback onCollision = [](int index, const std::vector<int>& collisions, const std::vector<Object<Mass>>& objects) {
-            float mass = objects[index].attributes.mass;
-            float radiusSquare = objects[index].attributes.radius * objects[index].attributes.radius;
-            glm::vec2 pos = objects[index].attributes.mass * objects[index].position;
-            glm::vec2 vel = objects[index].attributes.mass * objects[index].velocity;
-
-            for (int i : collisions) {
-                mass += objects[i].attributes.mass;
-                radiusSquare += objects[i].attributes.radius * objects[i].attributes.radius;
-                pos += objects[i].attributes.mass * objects[i].position;
-                vel += objects[i].attributes.mass * objects[i].velocity;
-            }
-
-            return Object<Mass>(pos / mass, vel / mass, mass, glm::sqrt(radiusSquare));
-        };
-
-        std::vector<Object<Mass>> objects;
-
-        float density = 1E10f;
-        for (int i = 0; i < 1000; i++) {
-            float radius = rand() / static_cast<float>(RAND_MAX) * 5.0f + 1.0f;
-            float mass = radius * radius * density;
-
-            const glm::vec2& position = {
-                rand() / static_cast<float>(RAND_MAX) * 800.0f - 400.0f,
-                rand() / static_cast<float>(RAND_MAX) * 800.0f - 400.0f,
-            };
-
-            const glm::vec2& velocity = 4.5f * glm::normalize(glm::vec2{position.y, -position.x});
-
-            objects.emplace_back(position, velocity, mass, radius);
-        }
-
-        Simulation<Mass, glm::vec2> sim = Simulation<Mass, glm::vec2>(objects, a, onCollision);
-
-        for (int i = 0; i < 10000; i++) {
-            sim.step();
-        }
+        Renderer<dimension, ValueType> renderer(&window);
+        renderer.updateBuffers(sim.states.front());
 
         int index = 0;
         auto frameDuration = 5ms;
@@ -80,12 +94,7 @@ int main(int, char**) {
         bool pause = true;
 
         while (!window.shouldClose()) {
-            if (index < sim.endTime()) {
-                renderer.draw(sim.getState(index));
-            }
-            else {
-                renderer.draw(sim.states.back());
-            }
+            renderer.draw();
 
             float time = glfwGetTime();
             timeSinceLastFrame += time - lastTime;
@@ -93,6 +102,10 @@ int main(int, char**) {
             if (std::chrono::duration<float, std::milli>(timeSinceLastFrame * 1000.0f) > frameDuration) {
                 if (!pause) {
                     index++;
+
+                    if (index < sim.endTime()) {
+                        renderer.updateBuffers(sim.getState(index));
+                    }
                 }
                 timeSinceLastFrame = 0;
             }
