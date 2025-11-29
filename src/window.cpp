@@ -67,6 +67,10 @@ void Window::sizeCallback(GLFWwindow* window, int width, int height) {
     Window* windowPtr = static_cast<Window*>(glfwGetWindowUserPointer(window));
     windowPtr->width = width;
     windowPtr->height = height;
+
+    for (const auto& sizeCallback : windowPtr->sizeCallbacks) {
+        sizeCallback.operator()(windowPtr, width, height);
+    }
 }
 
 void Window::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -92,4 +96,8 @@ void Window::scrollCallback(GLFWwindow* window, double xOffset, double yOffset) 
 
 void Window::addScrollCallback(const ScrollCallback& callback) {
     scrollCallbacks.push_back(callback);
+}
+
+void Window::addSizeCallback(const SizeCallback& callback) {
+    sizeCallbacks.push_back(callback);
 }

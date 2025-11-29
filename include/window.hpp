@@ -35,10 +35,13 @@ struct Window {
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset);
     using ScrollCallback = std::function<void(const Window*, double, double)>;
+    using SizeCallback = std::function<void(const Window*, int, int)>;
 
   private:
     std::vector<ScrollCallback> scrollCallbacks;
+    std::vector<SizeCallback> sizeCallbacks;
 
   public:
     void addScrollCallback(const ScrollCallback& callback);
+    void addSizeCallback(const SizeCallback& callback);
 };

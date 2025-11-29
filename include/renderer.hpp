@@ -1,4 +1,5 @@
 #pragma once
+#include "camera.hpp"
 #include "glType.hpp"
 #include "shaders.hpp"
 #include "simulation.hpp"
@@ -8,7 +9,6 @@
 #include <vector>
 
 #include <glm/gtc/constants.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 template<int dim, typename TValue>
 class Renderer {
@@ -17,6 +17,8 @@ class Renderer {
     unsigned int shaderProgram;
     unsigned int vbo, vao, ebo;
     unsigned int drawCount;
+
+    Camera<dim, TValue> camera;
 
     inline void setupShaders() {
         const char* vertexSource = getVertexShader<dim, TValue>();
@@ -95,18 +97,20 @@ class Renderer {
 
         setupShaders();
 
-        auto scrollCallback = [](const Window* window, double xOffset, double yOffset) {
-
+        auto scrollCallback = [&](const Window* window, double xOffset, double yOffset) {
+            camera.setZoom(camera.getZoom() * pow(2, yOffset));
         };
-
         window->addScrollCallback(scrollCallback);
+
+        auto sizeCallback = [&](const Window* window, int width, int height) {
+            camera.updateScreenSize(width, height);
+        };
+        window->addSizeCallback(sizeCallback);
         // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
 
     inline void draw() const {
-        int width = window->getWidth();
-        int height = window->getHeight();
-        const glm::mat<4, 4, TValue> projection = glm::ortho<TValue>(-width / 2, width / 2, -height / 2, height / 2);
+        const glm::mat<4, 4, TValue> projection = camera.getProjectionMatrix();
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);

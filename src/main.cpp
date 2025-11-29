@@ -17,9 +17,33 @@ const int dimension = 2;
 
 using Vec = glm::vec<dimension, ValueType>;
 
-Simulation<dimension, ValueType, Mass> runSimulation() {
+constexpr float au = 149.6f;
+constexpr float yr = 1.0f;
+constexpr float d = yr / 365.0f;
+constexpr float solar_mass = 1.988416E30f;
+constexpr ValueType G = 4 * glm::pi<ValueType>() * glm::pi<ValueType>() * au * au * au / (yr * yr) / solar_mass;
+
+struct Planet {
+    float distance;
+    float orbitalPeriod;
+    float mass;
+    float radius;
+};
+
+constexpr Planet planets[] = {
+    Planet{0.387f, 0.2408f, 3.3011E23f, 5 * 0.3829f},   // mercury
+    Planet{0.723f, 0.6152f, 4.8675E24f, 5 * 0.9499f},   // venus
+    Planet{1.0f, 1.0f, 5.9722E24f, 5.0f},               // earth
+    Planet{1.523f, 1.880f, 6.4171E24f, 5 * 0.533f},     // mars
+    Planet{5.204f, 11.852f, 1.8982E27f, 2.5 * 11.209f}, // jupiter
+    Planet{9.5826f, 29.448f, 5.6834E26f, 2.5 * 9.124f}, // saturn
+    Planet{19.1913f, 84.021f, 8.681E25f, 5 * 4.007f},   // uranus
+    Planet{30.07f, 164.8f, 1.02409E26f, 5 * 3.883f},    // neptune
+};
+
+Simulation<dimension, ValueType, Mass>
+runSimulation() {
     Simulation<2, ValueType, Mass>::ForceCallback a = [](int index, const std::vector<Object<2, ValueType, Mass>>& objects) {
-        static constexpr ValueType G = 6.6743E-11;
         Vec acceleration = Vec(0.0);
 
         for (int j = 0; j < objects.size(); j++) {
@@ -53,24 +77,14 @@ Simulation<dimension, ValueType, Mass> runSimulation() {
 
     std::vector<Object<dimension, ValueType, Mass>> objects;
 
-    float density = 1E10f;
-    for (int i = 0; i < 100; i++) {
-        float radius = rand() / static_cast<float>(RAND_MAX) * 5.0f + 1.0f;
-        float mass = radius * radius * density;
-
-        const Vec& position = {
-            rand() / static_cast<float>(RAND_MAX) * 800.0 - 400.0,
-            rand() / static_cast<float>(RAND_MAX) * 800.0 - 400.0,
-        };
-
-        const Vec& velocity = static_cast<ValueType>(2.5) * glm::normalize(Vec{position.y, -position.x});
-
-        objects.emplace_back(position, velocity, mass, radius);
+    objects.emplace_back(glm::vec2(0.0f), glm::vec2(0.0f), solar_mass, 10.0f); // sun
+    for (const Planet planet : planets) {
+        objects.emplace_back(glm::vec2{planet.distance * au, 0.0f}, glm::vec2{0.0f, -2 * au * planet.distance * glm::pi<float>() / (planet.orbitalPeriod * yr)}, planet.mass, planet.radius);
     }
 
-    Simulation<dimension, ValueType, Mass> sim = Simulation<dimension, ValueType, Mass>(objects, a, onCollision);
+    Simulation<dimension, ValueType, Mass> sim = Simulation<dimension, ValueType, Mass>(objects, a, onCollision, yr / 1000);
 
-    for (int i = 0; i < 5000; i++) {
+    for (int i = 0; i < 50000; i++) {
         sim.step();
     }
 
@@ -89,6 +103,7 @@ int main(int, char**) {
 
         int index = 0;
         auto frameDuration = 5ms;
+        int framesPerStep = 10;
         float timeSinceLastFrame = 0;
         float lastTime = 0;
         bool pause = true;
@@ -101,7 +116,7 @@ int main(int, char**) {
             lastTime = time;
             if (std::chrono::duration<float, std::milli>(timeSinceLastFrame * 1000.0f) > frameDuration) {
                 if (!pause) {
-                    index++;
+                    index += framesPerStep;
 
                     if (index < sim.endTime()) {
                         renderer.updateBuffers(sim.getState(index));
